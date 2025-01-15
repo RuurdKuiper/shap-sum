@@ -99,7 +99,7 @@ def render_shap_heatmap(summary_data, tokenizer):
 
     # Highlight hallucinations in pill selection
     selected_output_token_text = st.pills(
-        "Select an output token:", 
+        "Select an output token (tokens associated with hallucinations are marked with 🔴):", 
         options=styled_output_tokens,
         selection_mode="single",
         key="output_token_selection"
