@@ -53,7 +53,7 @@ def visualize_shap_multiline(input_tokens, shap_values, original_value, masked_v
                 bbox=dict(facecolor=color, alpha=0.8, boxstyle="round,pad=0.3"))
 
         # Add SHAP differences below tokens
-        ax.text(total_width+0.3, y_pos - 0.5, f"{shap_difference:.2f}", fontsize=6, color="black", ha="center")
+        ax.text(total_width, y_pos - 0.5, f"{shap_difference:.2f}", fontsize=6, color="black", ha="center")
         #  ax.text(total_width+0.3, y_pos - 0.5, f"{shap_difference:.2f}|{math.exp(original_value):.2f}|{math.exp(masked_value):.2f}", fontsize=6, color="black", ha="center")
 
         total_width += text_width * 0.1 + 0.5  # Add extra spacing between tokens
@@ -70,3 +70,65 @@ def visualize_shap_multiline(input_tokens, shap_values, original_value, masked_v
     ax.set_title(f"SHAP values for output token: '{output_token}', with original probability: {math.exp(original_value):.2f}")
 
     return fig  # **Return the figure for display**
+
+def render_shap_heatmap(summary_data, tokenizer):
+    """ Renders SHAP heatmap visualization. """
+    
+    # Extract hallucination triggers
+    hallucinated_words = set()
+    evaluation_data = summary_data.get("evaluation", {})
+    if isinstance(evaluation_data, dict):
+        hallucinated_words = set(evaluation_data.get("hallucination_triggers", []))
+
+    # Tokenize hallucinated words
+    hallucinated_tokens = set()
+    for word in hallucinated_words:
+        hallucinated_tokens.update(tokenizer.tokenize(word))
+    hallucinated_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in hallucinated_tokens]
+
+    # Tokenize output tokens
+    output_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in summary_data["output_tokens"]]
+    hallucinated_token_indices = {i for i, token in enumerate(output_tokens) if token in hallucinated_tokens}
+
+    # Store both plain and styled versions
+    plain_output_tokens = output_tokens[:]
+    styled_output_tokens = [
+        f"🔴**{token.upper()}**🔴" if i in hallucinated_token_indices else token
+        for i, token in enumerate(output_tokens)
+    ]
+
+    # Highlight hallucinations in pill selection
+    selected_output_token_text = st.pills(
+        "Select an output token:", 
+        options=styled_output_tokens,
+        selection_mode="single",
+        key="output_token_selection"
+    )
+
+    # Find the selected token index
+    token_map = {styled: plain for styled, plain in zip(styled_output_tokens, plain_output_tokens)}
+    if selected_output_token_text:
+        selected_plain_token = token_map[selected_output_token_text]
+        output_token_index = plain_output_tokens.index(selected_plain_token)
+    else:
+        output_token_index = 0  # Default to first token
+
+    # SHAP Visualization
+    shap_matrix = np.array(summary_data["shap_matrix"])
+    original_probs = np.array(summary_data["original_probs"])
+    masked_probs = np.array(summary_data["masked_probs"])
+    input_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in summary_data["input_tokens"]]
+
+    # Create Matplotlib figure
+    fig, ax = plt.subplots(figsize=(12, len(input_tokens) // 12))
+    visualize_shap_multiline(
+        input_tokens, 
+        shap_matrix[:, output_token_index], 
+        original_probs[output_token_index], 
+        masked_probs[:, output_token_index], 
+        output_tokens[output_token_index],
+        ax=ax
+    )
+
+    # Display figure
+    st.pyplot(fig)

@@ -5,26 +5,45 @@ import json
 import os
 import re
 import matplotlib.pyplot as plt
-from text_viz import visualize_shap_multiline
+from text_viz import render_shap_heatmap
 from graph_viz import create_shap_figure
+from transformers import AutoTokenizer
+from huggingface_hub import login
 
 st.set_page_config(layout="wide")
 
-# Set up file path for SHAP data
+# ================================
+# AUTHENTICATE & LOAD TOKENIZER
+# ================================
+@st.cache_resource
+def authenticate_huggingface():
+    hf_token = st.secrets["HUGGINGFACE_TOKEN"]
+    login(token=hf_token)
+    return hf_token
+
+@st.cache_resource
+def load_tokenizer():
+    authenticate_huggingface()
+    return AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B-Instruct")
+
+tokenizer = load_tokenizer()
+
+# ===================
+# 🔹 LOAD SHAP DATA
+# ===================
 SHAP_FILE_PATH = "shap_results.json"
 
-# Load SHAP data from file
 @st.cache_data
 def load_shap_data():
     if not os.path.exists(SHAP_FILE_PATH):
         st.error(f"SHAP data file not found at {SHAP_FILE_PATH}. Please generate the data first.")
         return []
-    
     with open(SHAP_FILE_PATH, "r") as f:
         return json.load(f)
 
-
-# Streamlit App
+# ===============================
+# 🔹 STREAMLIT APP MAIN INTERFACE
+# ===============================
 st.title("SHAP Dependency Visualization for LLM Summaries")
 
 # Load SHAP data
@@ -32,39 +51,39 @@ shap_data = load_shap_data()
 if not shap_data:
     st.stop()
 
-# Load data
+# Store SHAP results in session state
 if "shap_results" not in st.session_state:
-    st.session_state.shap_results = load_shap_data()
-num_summaries = len(st.session_state.shap_results)
+    st.session_state.shap_results = shap_data
+num_summaries = len(shap_data)
 
-# Create dropdown options: (Index + First Few Words of Article)
-dropdown_options = [f"{i}: {shap_data[i]['article'][:50]}..." for i in range(num_summaries)]
+# ==========================
+# 🔹 SUMMARY DROPDOWN LIST
+# ==========================
+dropdown_options = []
+for i, summary in enumerate(shap_data):
+    # Check if summary contains hallucinations
+    eval_data = summary.get("evaluation", {})
+    hallucinated = "hallucination_triggers" in eval_data and eval_data["hallucination_triggers"]
+    
+    # Add 🔴 marker if hallucinated
+    marker = "🔴" if hallucinated else ""
+    dropdown_options.append(f"{i}: {summary['article'][:50]}... {marker}")
 
-# Display the dropdown menu
-selected_option = st.selectbox("Select a summary:", dropdown_options)
+# Select summary
+selected_option = st.selectbox("Select a summary (summaries with hallucinations are marked with 🔴):", dropdown_options)
+index = int(selected_option.split(":")[0])  # Extract index
 
-# Extract the selected index
-index = int(selected_option.split(":")[0])  # Get index from string
-
-# Load the selected summary
+# Load selected summary
 selected_summary = shap_data[index]
 
-# Tokenize
-input_tokens = selected_summary["input_tokens"]
-input_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in input_tokens]
-output_tokens = selected_summary["output_tokens"]
-output_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in output_tokens]
-shap_matrix = np.array(selected_summary["shap_matrix"])
-original_probs = np.array(selected_summary["original_probs"])
-masked_probs = np.array(selected_summary["masked_probs"])
-
-# Create a dictionary to map output tokens to their indices
-output_token_dict = {token: i for i, token in enumerate(output_tokens)}
-
-# **🔹 Add a radio button for visualization modes**
+# ===================
+# 🔹 RADIO MENU
+# ===================
 viz_mode = st.radio("Select View Mode:", ["Text & Summary", "SHAP Heatmap", "Graph"], index=0)
 
-# **📌 Mode 1: Show text, summaries, and GPT-4 evaluation**
+# ===================
+# 📌 MODE 1: TEXT SUMMARY
+# ===================
 if viz_mode == "Text & Summary":
     st.subheader("Original Article")
     st.write(selected_summary["article"][:1000])
@@ -78,38 +97,17 @@ if viz_mode == "Text & Summary":
     st.subheader("GPT-4 Evaluation")
     st.write(selected_summary["evaluation"])
 
-# **📌 Mode 2: SHAP Heatmap Visualization**
+# ===================
+# 📌 MODE 2: SHAP HEATMAP
+# ===================
 elif viz_mode == "SHAP Heatmap":
 
-        # **Use `st.pills()` for token selection**
-    selected_output_token_text = st.pills(
-        "Select an output token:", 
-        options=output_tokens,
-        selection_mode="single",
-        key="output_token_selection"
-    )
+    # Call function to render heatmap
+    render_shap_heatmap(selected_summary, tokenizer)
 
-    # **Find the index of the selected token**
-    if selected_output_token_text:
-        output_token_index = output_tokens.index(selected_output_token_text)
-    else:
-        output_token_index = 0  # Default to first token
-
-    # **Create a figure before calling `visualize_shap_multiline`**
-    fig, ax = plt.subplots(figsize=(12, len(input_tokens)//12))  # Create figure explicitly
-    visualize_shap_multiline(
-        input_tokens, 
-        shap_matrix[:, output_token_index], 
-        original_probs[output_token_index], 
-        masked_probs[:, output_token_index], 
-        output_tokens[output_token_index],
-        ax=ax  # **Pass the existing axis to the function**
-    )
-
-    # **Use `st.pyplot(fig)` to display the Matplotlib figure**
-    st.pyplot(fig)
-
-# **📌 Mode 3: Graph-based Token Dependency**
+# ===================
+# 📌 MODE 3: GRAPH VISUALIZATION
+# ===================
 elif viz_mode == "Graph":
     st.subheader("Click on a Token to See Its Connections")
 
@@ -127,7 +125,7 @@ elif viz_mode == "Graph":
                 x_position = points[0]["x"]  # 0 for input, 1 for output
                 is_input = (x_position == 0)
 
-                # Generate an updated figure with the selected token highlighted
+                # Generate updated figure with token highlighted
                 fig = create_shap_figure(index, st.session_state.shap_results, highlight=(point_index, is_input))
             else:
                 fig = create_shap_figure(index, st.session_state.shap_results)
@@ -136,6 +134,6 @@ elif viz_mode == "Graph":
     else:
         fig = create_shap_figure(index, st.session_state.shap_results)
 
-    # Display the plot with selection enabled
+    # Display graph plot
     with plot_spot:
         st.session_state.selected_data = st.plotly_chart(fig, use_container_width=False, on_select="rerun", selection_mode='points')
