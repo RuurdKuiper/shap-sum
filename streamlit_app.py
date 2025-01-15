@@ -80,14 +80,20 @@ if viz_mode == "Text & Summary":
 
 # **📌 Mode 2: SHAP Heatmap Visualization**
 elif viz_mode == "SHAP Heatmap":
-    # Dropdown for selecting the output token
-    selected_output_token_text = st.selectbox(
+
+        # **Use `st.pills()` for token selection**
+    selected_output_token_text = st.pills(
         "Select an output token:", 
-        list(output_token_dict.keys())  # Show only token names
+        options=output_tokens,
+        selection_mode="single",
+        key="output_token_selection"
     )
 
-    # Retrieve the corresponding index
-    output_token_index = output_token_dict[selected_output_token_text]
+    # **Find the index of the selected token**
+    if selected_output_token_text:
+        output_token_index = output_tokens.index(selected_output_token_text)
+    else:
+        output_token_index = 0  # Default to first token
 
     # **Create a figure before calling `visualize_shap_multiline`**
     fig, ax = plt.subplots(figsize=(12, len(input_tokens)//12))  # Create figure explicitly

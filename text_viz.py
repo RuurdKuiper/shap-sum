@@ -53,15 +53,10 @@ def visualize_shap_multiline(input_tokens, shap_values, original_value, masked_v
                 bbox=dict(facecolor=color, alpha=0.8, boxstyle="round,pad=0.3"))
 
         # Add SHAP differences below tokens
-        ax.text(total_width, y_pos - 0.5, f"{shap_difference:.2f}", fontsize=8, color="black", ha="center")
+        ax.text(total_width+0.3, y_pos - 0.5, f"{shap_difference:.2f}", fontsize=6, color="black", ha="center")
+        #  ax.text(total_width+0.3, y_pos - 0.5, f"{shap_difference:.2f}|{math.exp(original_value):.2f}|{math.exp(masked_value):.2f}", fontsize=6, color="black", ha="center")
 
-        # Add original SHAP probability
-        ax.text(total_width + 0.5, y_pos - 0.5, f"{math.exp(original_value):.2f}", fontsize=8, color="black", ha="center")
-
-        # Add masked SHAP probability
-        ax.text(total_width + 1, y_pos - 0.5, f"{math.exp(masked_value):.2f}", fontsize=8, color="black", ha="center")
-
-        total_width += text_width * 0.1 + 1.5  # Add extra spacing between tokens
+        total_width += text_width * 0.1 + 0.5  # Add extra spacing between tokens
 
         # Move to next line after 12 tokens
         if i % tokens_per_line == 11:
@@ -72,6 +67,6 @@ def visualize_shap_multiline(input_tokens, shap_values, original_value, masked_v
     ax.set_xlim(0, 12)  # Limit X range to fit sentences
     ax.set_ylim(0, num_lines + 0.5)  # Adjust height dynamically
     ax.axis("off")  # Hide axes
-    ax.set_title(f"SHAP values for output token: {output_token}")
+    ax.set_title(f"SHAP values for output token: '{output_token}', with original probability: {math.exp(original_value):.2f}")
 
     return fig  # **Return the figure for display**
