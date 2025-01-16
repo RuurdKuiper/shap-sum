@@ -53,7 +53,7 @@ def visualize_shap_multiline(input_tokens, shap_values, original_value, masked_v
                 bbox=dict(facecolor=color, alpha=0.8, boxstyle="round,pad=0.3"))
 
         # Add SHAP differences below tokens
-        ax.text(total_width, y_pos - 0.5, f"{shap_difference:.2f}", fontsize=6, color="black", ha="center")
+        ax.text(total_width + 0.1, y_pos - 0.45, f"{shap_difference:.2f}", fontsize=6, color="black", ha="center")
         #  ax.text(total_width+0.3, y_pos - 0.5, f"{shap_difference:.2f}|{math.exp(original_value):.2f}|{math.exp(masked_value):.2f}", fontsize=6, color="black", ha="center")
 
         total_width += text_width * 0.1 + 0.5  # Add extra spacing between tokens
@@ -120,7 +120,7 @@ def render_shap_heatmap(summary_data, tokenizer):
     input_tokens = [re.sub(r'^[▁Ġ]', '', token) for token in summary_data["input_tokens"]]
 
     # Create Matplotlib figure
-    fig, ax = plt.subplots(figsize=(12, len(input_tokens) // 12))
+    fig, ax = plt.subplots(figsize=(12, len(input_tokens) // 18))
     visualize_shap_multiline(
         input_tokens, 
         shap_matrix[:, output_token_index], 
