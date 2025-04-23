@@ -40,7 +40,7 @@ def create_shap_figure(index, shap_results, highlight=None):
         mode="markers+text",
         text=input_tokens,
         textposition="middle left",
-        marker=dict(size=10, color="blue"),
+        marker=dict(size=18, color="blue"),
         name="Input Tokens",
         customdata=list(range(len(input_tokens))),
         hoverinfo="text"
@@ -48,12 +48,12 @@ def create_shap_figure(index, shap_results, highlight=None):
 
     # Add output tokens (right side)
     fig.add_trace(go.Scatter(
-        x=[0.6] * len(output_tokens),
+        x=[0.4] * len(output_tokens),
         y=output_positions,
         mode="markers+text",
         text=output_tokens,
         textposition="middle right",
-        marker=dict(size=16, color="red"),
+        marker=dict(size=24, color="red"),
         name="Output Tokens",
         customdata=list(range(len(output_tokens))),
         hoverinfo="text"
@@ -76,7 +76,7 @@ def create_shap_figure(index, shap_results, highlight=None):
                         width = 6 * abs(shap_matrix[i, j])/max(abs(shap_matrix[i,:]))
 
             fig.add_trace(go.Scatter(
-                x=[0, 1],
+                x=[0, 0.4],
                 y=[input_pos, output_pos],
                 mode="lines",
                 line=dict(width=width, color=f"rgba(50,50,50,{opacity})"),
@@ -86,7 +86,7 @@ def create_shap_figure(index, shap_results, highlight=None):
     # Remove legend and adjust layout
     fig.update_layout(
         title=f"SHAP Influence Graph for Summary {index}",
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-0.2, 0.8]),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-0.2, 0.6]),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         showlegend=False,
         height=1200
